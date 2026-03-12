@@ -14,19 +14,14 @@ cd "$(dirname "$0")"
 BRANCH="claude/review-fork-redirect-fDWb7"
 INTERVAL=300  # seconds between iterations
 
-iteration=0
-while true; do
-  iteration=$((iteration + 1))
-  echo ""
-  echo "═══════════════════════════════════════════════════════════"
-  echo "  CRO Experiment Loop — Iteration $iteration ($(date '+%H:%M:%S'))"
-  echo "═══════════════════════════════════════════════════════════"
+# Write the prompt to a temp file (avoids heredoc quoting issues)
+PROMPT_FILE="$(mktemp)"
+trap 'rm -f "$PROMPT_FILE"' EXIT
 
-  # Run one iteration via Claude Code in non-interactive mode
-  claude --print -p "$(cat <<'PROMPT'
+cat > "$PROMPT_FILE" << 'ENDPROMPT'
 You are an autonomous CRO agent. Execute ONE iteration of the experiment loop:
 
-1. Read results.tsv to see the current best composite_cro score and what's been tried.
+1. Read results.tsv to see the current best composite_cro score and what has been tried.
 2. Read program_web.md for the prioritised Wave 1-3 change list.
 3. Pick the next highest-priority UNTRIED change.
 4. Read the relevant site/ file, make the change (one focused edit).
@@ -44,8 +39,18 @@ IMPORTANT:
 - Never modify prepare_web.py, evaluate_web.py, or run_cro.py
 - All copy must be British English, direct, punchy
 - If run_cro.py crashes, read tail of run.log and try to fix
-PROMPT
-)" --allowedTools "Edit,Read,Bash,Grep,Glob,Write"
+ENDPROMPT
+
+iteration=0
+while true; do
+  iteration=$((iteration + 1))
+  echo ""
+  echo "======================================================="
+  echo "  CRO Experiment Loop - Iteration $iteration ($(date '+%H:%M:%S'))"
+  echo "======================================================="
+
+  # Run one iteration via Claude Code in non-interactive mode
+  claude --print -p "$(cat "$PROMPT_FILE")" --allowedTools "Edit,Read,Bash,Grep,Glob,Write"
 
   echo ""
   echo "  Iteration $iteration complete. Sleeping ${INTERVAL}s..."
