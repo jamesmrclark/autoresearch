@@ -36,7 +36,17 @@ export interface Experiment {
   wave: 1 | 2 | 3;
   status: "planned" | "running" | "completed" | "discarded";
   result?: ExperimentResult;
+  builtVariant?: VariantData;
   iteration: number;
+}
+
+export interface VariantData {
+  experiment_id: string;
+  control_description: string;
+  variant_description: string;
+  changes: Array<{ element: string; before: string; after: string }>;
+  full_variant_snippet: string;
+  rationale: string;
 }
 
 export interface ExperimentResult {

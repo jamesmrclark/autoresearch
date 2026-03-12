@@ -1,18 +1,9 @@
 import { useState, useCallback } from "react";
-import type { AppState, AppAction } from "../types";
+import type { AppState, AppAction, VariantData } from "../types";
 import { callClaude, parseJsonResponse } from "../lib/api";
 import { VARIANT_BUILDER_SYSTEM } from "../lib/prompts";
 import { Loader2, Copy, Download, CheckCircle2 } from "lucide-react";
 import { cn } from "../lib/utils";
-
-interface VariantData {
-  experiment_id: string;
-  control_description: string;
-  variant_description: string;
-  changes: Array<{ element: string; before: string; after: string }>;
-  full_variant_snippet: string;
-  rationale: string;
-}
 
 interface VariantsProps {
   state: AppState;
@@ -99,7 +90,8 @@ export function Variants({ state }: VariantsProps) {
                 value={selectedId}
                 onChange={(e) => {
                   setSelectedId(e.target.value);
-                  setVariant(null);
+                  const exp = state.experiments.find((ex) => ex.experiment_id === e.target.value);
+                  setVariant(exp?.builtVariant || null);
                 }}
                 className="w-full px-3 py-2 border border-slate-300 rounded-md text-sm"
               >
