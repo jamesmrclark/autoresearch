@@ -23,6 +23,5 @@ dev/
 # Results file
 results.tsv
 
-# CRO experiment artifacts
-site/
+# CRO experiment artifacts (site/ intentionally tracked for keep/discard loop)
 run.log
