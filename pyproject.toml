@@ -14,6 +14,8 @@ dependencies = [
     "rustbpe>=0.1.0",
     "tiktoken>=0.11.0",
     "torch==2.9.1",
+    "playwright>=1.48.0",
+    "anthropic>=0.39.0",
 ]
 
 [tool.uv.sources]
