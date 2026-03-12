@@ -14,8 +14,13 @@ dependencies = [
     "rustbpe>=0.1.0",
     "tiktoken>=0.11.0",
     "torch==2.9.1",
+]
+
+[project.optional-dependencies]
+cro = [
     "playwright>=1.48.0",
     "anthropic>=0.39.0",
+    "requests>=2.32.0",
 ]
 
 [tool.uv.sources]
