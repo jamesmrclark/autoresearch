@@ -38,27 +38,52 @@ TARGET_PAGES = [
     "/webinars/",
 ]
 
-# Chrome binary — try several locations
-CHROME_CANDIDATES = [
-    os.environ.get("CHROME_PATH", ""),
-    "/root/.cache/ms-playwright/chromium-1194/chrome-linux/chrome",
-    "/usr/bin/chromium-browser",
-    "/usr/bin/chromium",
-    "/usr/bin/google-chrome-stable",
-    "/usr/bin/google-chrome",
-    shutil.which("chromium-browser") or "",
-    shutil.which("chromium") or "",
-    shutil.which("google-chrome") or "",
-]
-
-
 def find_chrome() -> str:
-    """Find a working Chrome/Chromium binary."""
-    for candidate in CHROME_CANDIDATES:
-        if candidate and os.path.isfile(candidate):
-            return candidate
+    """Find a working Chrome/Chromium binary (env var, Playwright, system)."""
+    import glob as _glob
+
+    # 1. Explicit env var
+    env_path = os.environ.get("CHROME_PATH", "")
+    if env_path and os.path.isfile(env_path):
+        return env_path
+
+    # 2. Playwright-installed Chromium (auto-detect version directory)
+    playwright_patterns = [
+        # macOS
+        os.path.expanduser("~/Library/Caches/ms-playwright/chromium-*/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"),
+        os.path.expanduser("~/Library/Caches/ms-playwright/chromium-*/chrome-mac/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"),
+        # Linux
+        "/root/.cache/ms-playwright/chromium-*/chrome-linux/chrome",
+        os.path.expanduser("~/.cache/ms-playwright/chromium-*/chrome-linux/chrome"),
+    ]
+    for pattern in playwright_patterns:
+        matches = sorted(_glob.glob(pattern), reverse=True)
+        if matches:
+            return matches[0]
+
+    # 3. System Chrome
+    system_paths = [
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+        "/usr/bin/chromium-browser",
+        "/usr/bin/chromium",
+        "/usr/bin/google-chrome-stable",
+        "/usr/bin/google-chrome",
+    ]
+    for p in system_paths:
+        if os.path.isfile(p):
+            return p
+
+    # 4. shutil.which fallback
+    for name in ["chromium", "chromium-browser", "google-chrome", "google-chrome-stable"]:
+        found = shutil.which(name)
+        if found:
+            return found
+
     raise FileNotFoundError(
-        "No Chrome/Chromium binary found. Install Chromium or set CHROME_PATH."
+        "No Chrome/Chromium binary found. Either:\n"
+        "  - Set CHROME_PATH=/path/to/chrome\n"
+        "  - Run: playwright install chromium\n"
+        "  - Install Google Chrome"
     )
 
 
@@ -130,7 +155,7 @@ def clone_site(force: bool = False) -> Path:
 
 
 def _ensure_key_pages():
-    """Check that key pages exist; create placeholder if wget missed them."""
+    """Check that key pages exist; try per-page wget, then placeholder as last resort."""
     for page_path in TARGET_PAGES:
         # wget saves /free-trial/ as free-trial/index.html or free-trial.html
         candidates = [
@@ -140,16 +165,33 @@ def _ensure_key_pages():
         if page_path == "/":
             candidates = [SITE_DIR / "index.html"]
 
-        if not any(c.exists() for c in candidates):
-            print(f"  Warning: {page_path} not found in clone. Creating placeholder.")
-            target = candidates[0]
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(
-                f'<!DOCTYPE html><html><head><title>Rove - {page_path}</title></head>'
-                f'<body><h1>Placeholder for {page_path}</h1>'
-                f'<p>wget did not capture this page. Replace with actual content.</p>'
-                f'</body></html>'
+        if any(c.exists() and c.stat().st_size > 500 for c in candidates):
+            continue  # Already have real content
+
+        # Try fetching the individual page with wget
+        target = candidates[0]
+        target.parent.mkdir(parents=True, exist_ok=True)
+        page_url = SITE_URL + page_path
+        print(f"  Fetching {page_url} individually...")
+        try:
+            wget_page = subprocess.run(
+                ["wget", "-q", "-O", str(target), "--timeout=30", "--tries=2", page_url],
+                capture_output=True, text=True, timeout=60,
             )
+            if target.exists() and target.stat().st_size > 500:
+                print(f"    ✓ Got {page_path} ({target.stat().st_size} bytes)")
+                continue
+        except (subprocess.TimeoutExpired, FileNotFoundError):
+            pass
+
+        # Last resort: placeholder
+        print(f"  Warning: {page_path} could not be fetched. Creating placeholder.")
+        target.write_text(
+            f'<!DOCTYPE html><html><head><title>Rove - {page_path}</title></head>'
+            f'<body><h1>Placeholder for {page_path}</h1>'
+            f'<p>wget did not capture this page. Replace with actual content.</p>'
+            f'</body></html>'
+        )
 
 
 def _create_landing_page():

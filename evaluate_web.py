@@ -35,22 +35,63 @@ W_LLM = 0.40
 W_LIGHTHOUSE = 0.30
 W_PLAYWRIGHT = 0.30
 
-# Chrome binary resolution
+# Chrome binary resolution — check env var, then common Playwright + system paths
+def _find_chrome() -> str:
+    # 1. Explicit env var
+    env_path = os.environ.get("CHROME_PATH", "")
+    if env_path and os.path.isfile(env_path):
+        return env_path
+
+    # 2. Playwright-installed Chromium (auto-detect version directory)
+    import glob
+    playwright_patterns = [
+        # macOS
+        os.path.expanduser("~/Library/Caches/ms-playwright/chromium-*/chrome-mac-arm64/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"),
+        os.path.expanduser("~/Library/Caches/ms-playwright/chromium-*/chrome-mac/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing"),
+        # Linux
+        "/root/.cache/ms-playwright/chromium-*/chrome-linux/chrome",
+        os.path.expanduser("~/.cache/ms-playwright/chromium-*/chrome-linux/chrome"),
+    ]
+    for pattern in playwright_patterns:
+        matches = sorted(glob.glob(pattern), reverse=True)  # newest version first
+        if matches:
+            return matches[0]
+
+    # 3. System Chrome
+    system_paths = [
+        "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",  # macOS
+        "/usr/bin/chromium-browser",
+        "/usr/bin/chromium",
+        "/usr/bin/google-chrome-stable",
+        "/usr/bin/google-chrome",
+    ]
+    for p in system_paths:
+        if os.path.isfile(p):
+            return p
+
+    # 4. shutil.which fallback
+    import shutil
+    for name in ["chromium", "chromium-browser", "google-chrome", "google-chrome-stable"]:
+        found = shutil.which(name)
+        if found:
+            return found
+
+    raise FileNotFoundError(
+        "No Chrome/Chromium binary found. Either:\n"
+        "  - Set CHROME_PATH=/path/to/chrome\n"
+        "  - Run: playwright install chromium\n"
+        "  - Install Google Chrome"
+    )
+
+
+# Keep a module-level list for Playwright launcher compatibility
 CHROME_CANDIDATES = [
     os.environ.get("CHROME_PATH", ""),
-    "/root/.cache/ms-playwright/chromium-1194/chrome-linux/chrome",
     "/usr/bin/chromium-browser",
     "/usr/bin/chromium",
     "/usr/bin/google-chrome-stable",
     "/usr/bin/google-chrome",
 ]
-
-
-def _find_chrome() -> str:
-    for c in CHROME_CANDIDATES:
-        if c and os.path.isfile(c):
-            return c
-    raise FileNotFoundError("No Chrome binary found. Set CHROME_PATH env var.")
 
 
 # ── Data Classes ───────────────────────────────────────────────────────────────
