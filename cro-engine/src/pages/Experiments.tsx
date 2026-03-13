@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef } from "react";
-import type { AppState, AppAction, Experiment, VariantData } from "../types";
+import type { AppState, AppAction, Experiment, VariantData, CroScores } from "../types";
 import { callClaude, parseJsonResponse } from "../lib/api";
-import { EXPERIMENT_GENERATION_SYSTEM, VARIANT_BUILDER_SYSTEM } from "../lib/prompts";
+import { EXPERIMENT_GENERATION_SYSTEM, VARIANT_BUILDER_SYSTEM, LLM_JUDGE_SYSTEM } from "../lib/prompts";
 import { Loader2, GripVertical, ChevronDown, ChevronUp, Rocket } from "lucide-react";
 import { cn } from "../lib/utils";
 
@@ -15,7 +15,7 @@ export function Experiments({ state, dispatch }: ExperimentsProps) {
   const [error, setError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [launching, setLaunching] = useState(false);
-  const [launchProgress, setLaunchProgress] = useState({ current: 0, total: 0, currentId: "" });
+  const [launchProgress, setLaunchProgress] = useState({ current: 0, total: 0, currentId: "", step: "" });
   const abortRef = useRef(false);
 
   const generateExperiments = useCallback(async () => {
@@ -49,6 +49,15 @@ export function Experiments({ state, dispatch }: ExperimentsProps) {
     }
   }, [state, dispatch]);
 
+  const scoreHtml = async (apiKey: string, html: string, pageName: string): Promise<CroScores> => {
+    const truncated = html.slice(0, 15000);
+    const userPrompt = `Page: ${pageName}\n\nHTML content:\n${truncated}`;
+    const response = await callClaude(apiKey, LLM_JUDGE_SYSTEM, userPrompt, 500);
+    const data = parseJsonResponse(response) as Omit<CroScores, "average">;
+    const avg = (data.clarity + data.urgency + data.trust + data.friction + data.mobile_readiness) / 5;
+    return { ...data, average: Math.round(avg * 10) / 10 };
+  };
+
   const launchAll = useCallback(async () => {
     if (!state.apiKey) return;
     const planned = state.experiments.filter((e) => e.status === "planned");
@@ -57,33 +66,66 @@ export function Experiments({ state, dispatch }: ExperimentsProps) {
     setLaunching(true);
     setError(null);
     abortRef.current = false;
-    setLaunchProgress({ current: 0, total: planned.length, currentId: "" });
+    setLaunchProgress({ current: 0, total: planned.length, currentId: "", step: "" });
 
     for (let i = 0; i < planned.length; i++) {
       if (abortRef.current) break;
       const exp = planned[i];
-      setLaunchProgress({ current: i + 1, total: planned.length, currentId: exp.experiment_id });
 
+      // Step 1: Build variant
+      setLaunchProgress({ current: i + 1, total: planned.length, currentId: exp.experiment_id, step: "Building variant" });
+
+      let variantData: VariantData | undefined;
       try {
         const pageAnalysis = state.crawlResults.find(
           (r) => r.url.includes(exp.page) || exp.page.includes(r.url)
         );
         const context = JSON.stringify({ experiment: exp, page_analysis: pageAnalysis || null });
         const response = await callClaude(state.apiKey, VARIANT_BUILDER_SYSTEM, context, 8192);
-        const variantData = parseJsonResponse(response) as VariantData;
-
-        dispatch({
-          type: "UPDATE_EXPERIMENT",
-          payload: { id: exp.experiment_id, updates: { status: "running", builtVariant: variantData } },
-        });
+        variantData = parseJsonResponse(response) as VariantData;
       } catch (e: unknown) {
-        // Log the error but continue with the rest
         console.error(`Failed to build variant for ${exp.experiment_id}:`, e);
-        dispatch({
-          type: "UPDATE_EXPERIMENT",
-          payload: { id: exp.experiment_id, updates: { status: "running" } },
-        });
       }
+
+      if (abortRef.current) break;
+
+      // Step 2: Score control
+      setLaunchProgress({ current: i + 1, total: planned.length, currentId: exp.experiment_id, step: "Scoring control" });
+
+      let controlScores: CroScores | undefined;
+      try {
+        const controlHtml = exp.variant_a.code_or_copy || exp.variant_a.description;
+        controlScores = await scoreHtml(state.apiKey, controlHtml, `${exp.page} (control)`);
+      } catch (e: unknown) {
+        console.error(`Failed to score control for ${exp.experiment_id}:`, e);
+      }
+
+      if (abortRef.current) break;
+
+      // Step 3: Score variant
+      setLaunchProgress({ current: i + 1, total: planned.length, currentId: exp.experiment_id, step: "Scoring variant" });
+
+      let variantScores: CroScores | undefined;
+      try {
+        const variantHtml = variantData?.full_variant_snippet || exp.variant_b.code_or_copy || exp.variant_b.description;
+        variantScores = await scoreHtml(state.apiKey, variantHtml, `${exp.page} (variant)`);
+      } catch (e: unknown) {
+        console.error(`Failed to score variant for ${exp.experiment_id}:`, e);
+      }
+
+      // Update experiment with variant + scores
+      dispatch({
+        type: "UPDATE_EXPERIMENT",
+        payload: {
+          id: exp.experiment_id,
+          updates: {
+            status: "running",
+            ...(variantData && { builtVariant: variantData }),
+            ...(controlScores && { controlScores }),
+            ...(variantScores && { variantScores }),
+          },
+        },
+      });
     }
 
     setLaunching(false);
@@ -158,7 +200,7 @@ export function Experiments({ state, dispatch }: ExperimentsProps) {
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm font-medium text-emerald-800 flex items-center gap-2">
               <Loader2 size={14} className="animate-spin" />
-              Building & launching {launchProgress.currentId}...
+              {launchProgress.step} — {launchProgress.currentId}...
             </p>
             <span className="text-xs text-emerald-600">
               {launchProgress.current} / {launchProgress.total}

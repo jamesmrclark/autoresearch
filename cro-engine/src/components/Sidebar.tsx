@@ -6,6 +6,7 @@ import {
   FlaskConical,
   SplitSquareVertical,
   BarChart3,
+  ClipboardCheck,
   Settings,
 } from "lucide-react";
 
@@ -14,6 +15,7 @@ const NAV_ITEMS: { id: Page; label: string; icon: React.ElementType }[] = [
   { id: "crawl", label: "Crawl & Analyse", icon: Search },
   { id: "experiments", label: "Experiments", icon: FlaskConical },
   { id: "variants", label: "Variants", icon: SplitSquareVertical },
+  { id: "scorecard", label: "Scorecard", icon: ClipboardCheck },
   { id: "results", label: "Results", icon: BarChart3 },
 ];
 

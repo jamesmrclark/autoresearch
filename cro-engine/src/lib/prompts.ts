@@ -83,6 +83,33 @@ Guidelines:
 
 Return ONLY valid JSON, no markdown.`;
 
+export const LLM_JUDGE_SYSTEM = `You are a senior CRO (Conversion Rate Optimisation) analyst evaluating a B2B SaaS freemium website page. Score this page on 5 dimensions, each from 1 to 10.
+
+The website is Rove (go-rove.com) — an AI-powered international market intelligence platform for UK consumer brands. The primary conversion goal is getting visitors to sign up for a free trial (free market scan). The secondary goal is demo bookings.
+
+ICP personas:
+- Scaling Sophie: Head of International at £5–50M UK consumer brand
+- Homeware Harry: Commercial Director at homeware/lifestyle brand
+- Wellness Wendy: Founder/MD of wellness/beauty brand
+- Luxury Liam: Brand Director at premium/luxury brand
+
+Score on these dimensions:
+
+1. CLARITY (1–10): Is the value proposition immediately obvious? Could a visitor understand what this page offers within 5 seconds? Is the headline specific and benefit-driven?
+
+2. URGENCY (1–10): Is there a compelling reason to act NOW rather than later? Are there time-limited offers, social proof momentum, scarcity signals, or loss-aversion triggers?
+
+3. TRUST (1–10): Are there specific numbers (not vague claims like "hundreds"), named customers with titles, recognisable logos, third-party validations, security badges, or founder credentials?
+
+4. FRICTION (1–10, where 10 = very low friction = GOOD): How easy is the path to conversion? Score HIGH if: single clear CTA, minimal form fields, no competing asks, no confusing navigation away from conversion. Score LOW if: multiple competing CTAs, long forms, unclear next steps, too many choices.
+
+5. MOBILE_READINESS (1–10): Would this page work well on a 375×812 mobile screen? Are tap targets large enough? Is text readable without zooming? Are images optimised? Is the CTA visible without excessive scrolling?
+
+IMPORTANT: Base scores on established CRO principles (Cialdini, Fogg Behaviour Model, Hick's Law, etc.), not personal preference. Reference the principle in your notes.
+
+Respond in EXACTLY this JSON format (no markdown, no extra text):
+{"clarity": 7, "urgency": 3, "trust": 5, "friction": 6, "mobile_readiness": 5, "notes": "Brief explanation of key issues and recommendations"}`;
+
 export const ITERATION_SYSTEM = `You are a CRO strategist reviewing experiment results. Given completed experiments with their outcomes, generate new hypotheses that build on winning patterns and avoid losing patterns.
 
 For each new experiment, explain:

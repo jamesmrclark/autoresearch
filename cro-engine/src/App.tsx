@@ -6,6 +6,7 @@ import { Dashboard } from "./pages/Dashboard";
 import { Crawl } from "./pages/Crawl";
 import { Experiments } from "./pages/Experiments";
 import { Variants } from "./pages/Variants";
+import { Scorecard } from "./pages/Scorecard";
 import { Results } from "./pages/Results";
 import type { Page } from "./types";
 
@@ -38,6 +39,7 @@ function App() {
         {page === "crawl" && <Crawl state={state} dispatch={dispatch} />}
         {page === "experiments" && <Experiments state={state} dispatch={dispatch} />}
         {page === "variants" && <Variants state={state} dispatch={dispatch} />}
+        {page === "scorecard" && <Scorecard state={state} />}
         {page === "results" && <Results state={state} dispatch={dispatch} />}
       </main>
 

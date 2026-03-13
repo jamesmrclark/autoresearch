@@ -37,6 +37,8 @@ export interface Experiment {
   status: "planned" | "running" | "completed" | "discarded";
   result?: ExperimentResult;
   builtVariant?: VariantData;
+  controlScores?: CroScores;
+  variantScores?: CroScores;
   iteration: number;
 }
 
@@ -47,6 +49,16 @@ export interface VariantData {
   changes: Array<{ element: string; before: string; after: string }>;
   full_variant_snippet: string;
   rationale: string;
+}
+
+export interface CroScores {
+  clarity: number;
+  urgency: number;
+  trust: number;
+  friction: number;
+  mobile_readiness: number;
+  notes: string;
+  average: number;
 }
 
 export interface ExperimentResult {
@@ -99,4 +111,4 @@ export type AppAction =
   | { type: "ADD_ITERATION"; payload: Iteration }
   | { type: "RESET_ALL" };
 
-export type Page = "dashboard" | "crawl" | "experiments" | "variants" | "results";
+export type Page = "dashboard" | "crawl" | "experiments" | "variants" | "results" | "scorecard";
